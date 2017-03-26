@@ -53,7 +53,7 @@ public class AutonomyLogic {
     double adjustedAngle;
     double distance;
 
-    boolean arduinoFound;
+    //boolean arduinoFound;
     boolean movingBackwards;
     boolean withinAngleTolerance;
     boolean withinReverseAngleTolerance;
@@ -86,6 +86,7 @@ public class AutonomyLogic {
     }
 
     public InitialPosition getStartingPos(){
+        //TODO: get autonomy initialization position
         String textInputStartingPos = autonomyActivity.angleOffsetField.getText().toString();
         InitialPosition startingPos = InitialPosition.A_NORTH;
         if(textInputStartingPos.equals("90")){
@@ -119,33 +120,22 @@ public class AutonomyLogic {
     public void performNextAutonomyAction() {
         switch (autonomyState) {
             case INITIALIZE:
-                // Send 'R' to arduino
-                //autonomyActivity.updateIR('R');
-
-                if (true || autonomyActivity.arduinoConnection.getReceivedData() != null) {
-                    if (true || !autonomyActivity.arduinoConnection.getReceivedData().isEmpty() && autonomyActivity.arduinoConnection.getReceivedData().matches("[0-9]")) {
-                        try {
-                            //initializationPosition = Integer.parseInt(autonomyActivity.arduinoConnection.getReceivedData());
-                            startingPos = getStartingPos();
-                            if(startingPos == InitialPosition.A_WEST || startingPos == InitialPosition.B_WEST){
-                                rotatePath(1);
-                            }else if(startingPos == InitialPosition.A_SOUTH || startingPos == InitialPosition.B_SOUTH){
-                                rotatePath(2);
-                            }else if(startingPos == InitialPosition.A_EAST || startingPos == InitialPosition.B_EAST){
-                                rotatePath(3);
-                            }
-                            destinationTranslation[0] = path.get(0);
-                            destinationTranslation[1] = path.get(1);
-                            autonomyState = AutonomyState.DRIVE;
-                        } catch (Exception ex) {
-                            Log.v(autonomyActivity.TAG, "Failed to get starting pos: " + ex.getLocalizedMessage());
-                        }
+                try {
+                    //initializationPosition = Integer.parseInt(autonomyActivity.arduinoConnection.getReceivedData());
+                    startingPos = getStartingPos();
+                    if(startingPos == InitialPosition.A_WEST || startingPos == InitialPosition.B_WEST){
+                        rotatePath(1);
+                    }else if(startingPos == InitialPosition.A_SOUTH || startingPos == InitialPosition.B_SOUTH){
+                        rotatePath(2);
+                    }else if(startingPos == InitialPosition.A_EAST || startingPos == InitialPosition.B_EAST){
+                        rotatePath(3);
                     }
+                    destinationTranslation[0] = path.get(0);
+                    destinationTranslation[1] = path.get(1);
+                    autonomyState = AutonomyState.DRIVE;
+                } catch (Exception ex) {
+                    Log.v(autonomyActivity.TAG, "Failed to get starting pos: " + ex.getLocalizedMessage());
                 }
-                autonomyActivity.receivedDataView.setText("Received Data: " + autonomyActivity.arduinoConnection.getReceivedData());
-
-                // Send ' ' to arduino
-                //autonomyActivity.updateIR(' ');
                 break;
             case DRIVE:
                 final String driveString = drive(distance, adjustedAngle);
@@ -183,9 +173,6 @@ public class AutonomyLogic {
     }
 
     public String drive(double distance, double adjustedAngle) {
-
-        arduinoFound = autonomyActivity.arduinoConnection.arduinoConnected();
-
         String adjustedAngleString;
 
         leftSpeed = 0;
@@ -235,12 +222,7 @@ public class AutonomyLogic {
         updateLeft(leftSpeed);
         updateRight(rightSpeed);
 
-        //Send new commands to Arduino
-        if (arduinoFound) {
-            synchronized (autonomyActivity.bufferLock){
-                autonomyActivity.arduinoConnection.sendCommands();
-            }
-        }
+        //TODO: Send commands to pi
 
         return adjustedAngleString;
     }
@@ -286,13 +268,13 @@ public class AutonomyLogic {
 
     public void actuateDown(int time) {
         synchronized (autonomyActivity.bufferLock){
-            autonomyActivity.arduinoConnection.setActuate((byte) (-80));
+            //autonomyActivity.arduinoConnection.setActuate((byte) (-80));
         }
-        if (autonomyActivity.arduinoConnection.arduinoConnected()) {
+        /*if (autonomyActivity.arduinoConnection.arduinoConnected()) {
             synchronized (autonomyActivity.bufferLock) {
                 autonomyActivity.arduinoConnection.sendCommands();
             }
-        }
+        }*/
         try {
             Thread.sleep(time * 100);
         } catch (Exception ignored) {
@@ -300,20 +282,20 @@ public class AutonomyLogic {
         }
 
         synchronized (autonomyActivity.bufferLock){
-            autonomyActivity.arduinoConnection.setActuate((byte) (0));
-            autonomyActivity.arduinoConnection.sendCommands();
+            //autonomyActivity.arduinoConnection.setActuate((byte) (0));
+            //autonomyActivity.arduinoConnection.sendCommands();
         }
     }
 
     public void actuateUp(int time) {
         synchronized (autonomyActivity.bufferLock){
-            autonomyActivity.arduinoConnection.setActuate((byte) (80));
+            //autonomyActivity.arduinoConnection.setActuate((byte) (80));
         }
-        if (autonomyActivity.arduinoConnection.arduinoConnected()) {
+        /*if (autonomyActivity.arduinoConnection.arduinoConnected()) {
             synchronized (autonomyActivity.bufferLock){
                 autonomyActivity.arduinoConnection.sendCommands();
             }
-        }
+        }*/
 
         try {
             Thread.sleep(time * 100);
@@ -322,54 +304,16 @@ public class AutonomyLogic {
         }
 
         synchronized (autonomyActivity.bufferLock){
-            autonomyActivity.arduinoConnection.setActuate((byte) (0));
-            autonomyActivity.arduinoConnection.sendCommands();
+            //autonomyActivity.arduinoConnection.setActuate((byte) (0));
+            //autonomyActivity.arduinoConnection.sendCommands();
         }
     }
 
     public String doDig(int time) {
-        synchronized (autonomyActivity.bufferLock){
-            autonomyActivity.arduinoConnection.setDig((byte) (time));
-        }
-        if (autonomyActivity.arduinoConnection.arduinoConnected()) {
-            synchronized (autonomyActivity.bufferLock){
-                autonomyActivity.arduinoConnection.sendCommands();
-            }
-        }
-
-        try {
-            Thread.sleep(time * 100 + 100);
-        } catch (Exception ignored) {
-
-        }
-
-        synchronized (autonomyActivity.bufferLock) {
-            autonomyActivity.arduinoConnection.setDig((byte) (0));
-        }
-
         return null;
     }
 
     public String doDump(int time) {
-        synchronized (autonomyActivity.bufferLock){
-            autonomyActivity.arduinoConnection.setDump((byte) (time));
-        }
-        if (autonomyActivity.arduinoConnection.arduinoConnected()) {
-            synchronized (autonomyActivity.bufferLock){
-                autonomyActivity.arduinoConnection.sendCommands();
-            }
-        }
-
-        try {
-            Thread.sleep(time * 100 + 100);
-        } catch (Exception ignored) {
-
-        }
-
-        synchronized (autonomyActivity.bufferLock){
-            autonomyActivity.arduinoConnection.setDump((byte) (0));
-        }
-
         return null;
     }
 
@@ -399,13 +343,13 @@ public class AutonomyLogic {
 
     public void updateLeft(int speed) {
         synchronized (autonomyActivity.bufferLock){
-            autonomyActivity.arduinoConnection.setLeftForward((byte) speed);
+            //autonomyActivity.arduinoConnection.setLeftForward((byte) speed);
         }
     }
 
     public void updateRight(int speed) {
         synchronized (autonomyActivity.bufferLock){
-            autonomyActivity.arduinoConnection.setRightForward((byte) speed);
+            //autonomyActivity.arduinoConnection.setRightForward((byte) speed);
         }
     }
 

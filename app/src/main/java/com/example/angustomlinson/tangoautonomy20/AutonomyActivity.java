@@ -87,44 +87,6 @@ public class AutonomyActivity extends Activity {
     public DoubleBuffer backPlaneBuffer = DoubleBuffer.allocate(DEPTH_POINT_COUNT * 4);
     public DoubleBuffer frontPlaneBuffer;
 
-    // ARDUINO VARIABLES:
-    public ArduinoConnection arduinoConnection; // declare Connection to Arduino
-
-    // NETWORK VARIABLES:
-    private boolean networkingEnabled = false;
-
-    // AUTONOMY VARIABLES:
-    /*final static double DEFAULT_X = AutonomyLogic.DEFAULT_X, DEFAULT_Y = AutonomyLogic.DEFAULT_Y;
-
-    private int initializationPosition;
-
-    private boolean gentleTurns = AutonomyLogic.PERFORM_GENTLE_TURNS;
-    //private int leftSpeed = 0;
-    //private int rightSpeed = 0;
-
-    private boolean autonomyActive = false;
-
-    public double[] destinationTranslation;
-    ArrayList<Double> path = new ArrayList<Double>();
-    int currentPoint = -1;
-
-    private double yaw;
-    private double angle;
-    private double adjustedAngle;
-    private double distance;
-
-    boolean arduinoFound;
-    boolean movingBackwards;
-    boolean withinAngleTolerance;
-    boolean withinReverseAngleTolerance;
-
-    private AutonomyState autonomyState;
-    private InitialPosition startingPos;
-
-    double ANGLE_TOLERANCE = 5;
-    double DISTANCE_TOLERANCE = 0.5;
-    */
-
     AutonomyLogic autonomyLogic = new AutonomyLogic(this);
 
     // TextViews and Buttons:
@@ -180,8 +142,8 @@ public class AutonomyActivity extends Activity {
 
         colorCameraIntrinsics = mTango.getCameraIntrinsics(TangoCameraIntrinsics.TANGO_CAMERA_COLOR);
 
-        //Initialize Network
-        arduinoConnection = new ArduinoConnection(this);
+        //Initialize Connection to Raspberry Pi
+
 
         autonomyLogic.initializeDrivePath();
 
@@ -335,32 +297,26 @@ public class AutonomyActivity extends Activity {
                         runOnUiThread(new Runnable() {
                             @Override
                             public void run() {
-                                synchronized (arduinoLock) {
-                                    displayArduinoStatus();
-
-                                }
                                 synchronized (mUiPoseLock) {
                                     if (mPose == null) {
                                         return;
                                     }
                                     initialPositionView.setText("Initial Position: " + autonomyLogic.initializationPosition);
 
-                                    // Autonomy Functionality
-                                    if (!networkingEnabled) {
-                                        final CheckBox checkBox = (CheckBox) findViewById(R.id.autonomy_checkbox);
-                                        checkBox.setOnClickListener(new OnClickListener() {
-                                            @Override
-                                            public void onClick(View v) {
-                                                synchronized (bufferLock) {
-                                                    arduinoConnection.resetBuffer();
-                                                    if (arduinoConnection.arduinoConnected())
-                                                        arduinoConnection.sendCommands();
-                                                }
+                                    final CheckBox checkBox = (CheckBox) findViewById(R.id.autonomy_checkbox);
+                                    checkBox.setOnClickListener(new OnClickListener() {
+                                        @Override
+                                        public void onClick(View v) {
+                                            synchronized (bufferLock) {
+                                                //arduinoConnection.resetBuffer();
+                                                //if (arduinoConnection.arduinoConnected())
+                                                //    arduinoConnection.sendCommands();
                                             }
-                                        });
+                                        }
+                                    });
 
-                                        autonomyLogic.autonomyActive = checkBox.isChecked();
-                                    }
+                                    autonomyLogic.autonomyActive = checkBox.isChecked();
+
                                     updateUI();
                                     extractYaw();
                                     autonomyLogic.findAdjustedAngle();
@@ -389,20 +345,6 @@ public class AutonomyActivity extends Activity {
                 }
             }
         }).start();
-    }
-
-    private void displayArduinoStatus() {
-        // Display Arduino Status
-        String arduinoFoundText = arduinoConnection.arduinoConnected() ? "Arduino Found" : "Arduino Not Found";
-        arduinoFoundText = arduinoFoundText + arduinoConnection.foundStatus();
-        arduinoFoundView.setText(arduinoFoundText);
-        final boolean arduinoFound = arduinoConnection.arduinoConnected();
-        if (arduinoFound)
-            arduinoFoundView.setTextColor(getResources().getColor(R.color.tango_green));
-        else
-            arduinoFoundView.setTextColor(getResources().getColor(R.color.status_tick_red));
-
-        receivedDataView.setText("Received Data: " + arduinoConnection.getReceivedData());
     }
 
     private void updateUI() {
@@ -435,17 +377,7 @@ public class AutonomyActivity extends Activity {
                 decimalFormat.format(autonomyLogic.destinationTranslation[1]) + ", " +
                 decimalFormat.format(autonomyLogic.destinationTranslation[2]) + "}";
         destinationTextView.setText(destinationString);
-
-        // displays the buffer
-        incomingCommandsView.setText("Incoming Commands: " + arduinoConnection.bufferValues());
-        incomingCommandsView.refreshDrawableState();
     }
-
-    /*public void updateIR(char character) {
-        synchronized (bufferLock){
-            arduinoConnection.setIR((byte) character);
-        }
-    }*/
 
     private void setupExtrinsics() {
         TangoCoordinateFramePair framePair = new TangoCoordinateFramePair();
@@ -519,82 +451,6 @@ public class AutonomyActivity extends Activity {
         return tangoUx;
     }
 
-    /*******************************************************
-     * Networking code... Eventually needs to be refactored somewhere else
-     ******************************************************/
-
-    // Method called in content_main.xml when button is clicked
-    public void networkConnect(View view) {
-        networkingEnabled = true;
-
-        // Disable button
-        connectButton.post(new Runnable() {
-            @Override
-            public void run() {
-                connectButton.setEnabled(false);
-            }
-        });
-
-        networkStatusView.post(new Runnable() {
-            @Override
-            public void run() {
-                networkStatusView.setMovementMethod(new ScrollingMovementMethod());
-                networkStatusView.setText("Waiting for connection.");
-            }
-        });
-
-        final WeakReference<AutonomyActivity> thisActivityReference = new WeakReference<>(this);
-
-        Log.v(NETWORK_TAG, "Before Handler");
-        Handler networkHandler = new NetworkHandler(thisActivityReference);
-
-        // Declare Wireless Network Connection
-        int NETWORK_PORT_NUMBER = 7098;
-        Network network = new Network(NETWORK_PORT_NUMBER, networkHandler);
-        Thread networkThread = new Thread(network, "Network");
-        networkThread.start();
-
-        // Fetch and Display IP Address
-        final String IP = getIpAddress();
-        if (IP != null) {
-            textIPView.post(new Runnable() {
-                @Override
-                public void run() {
-                    textIPView.setText(IP);
-                }
-            });
-            Log.v(NETWORK_TAG, "IP: " + IP);
-        } else {
-            textIPView.post(new Runnable() {
-                @Override
-                public void run() {
-                    textIPView.setText("Could not fetch IP Address...");
-                }
-            });
-            Log.e(NETWORK_TAG, "Error: Could not fetch IP");
-        }
-
-    }
-
-    public static String getIpAddress() {
-        String ipAddress = null;
-        try {
-            Enumeration en;
-            for (en = NetworkInterface.getNetworkInterfaces(); en.hasMoreElements(); ) {
-                NetworkInterface intf = (NetworkInterface) en.nextElement();
-                for (Enumeration enumIpAddr = intf.getInetAddresses(); enumIpAddr.hasMoreElements(); ) {
-                    InetAddress inetAddress = (InetAddress) enumIpAddr.nextElement();
-                    if (!inetAddress.isLoopbackAddress() && inetAddress instanceof Inet4Address) {
-                        ipAddress = inetAddress.getHostAddress();
-                    }
-                }
-            }
-        } catch (SocketException ex) {
-            ex.printStackTrace();
-        }
-        return ipAddress;
-    }
-
     private void extractYaw() {
         double yaw = autonomyLogic.yaw;
         yaw = Math.toDegrees(Math.atan2((2 * ((mPose.rotation[0] * mPose.rotation[1]) + (mPose.rotation[2] * mPose.rotation[3]))),
@@ -653,33 +509,13 @@ public class AutonomyActivity extends Activity {
             if (!activity.autonomyLogic.autonomyActive) {
                 assert remoteMotorBuffer != null;
                 synchronized (activity.bufferLock) {
-                    activity.arduinoConnection.setLeftForward(remoteMotorBuffer[ArduinoConnection.Motors.LEFT.ordinal()]);
+                    /*activity.arduinoConnection.setLeftForward(remoteMotorBuffer[ArduinoConnection.Motors.LEFT.ordinal()]);
                     activity.arduinoConnection.setRightForward(remoteMotorBuffer[ArduinoConnection.Motors.RIGHT.ordinal()]);
                     activity.arduinoConnection.setDump(remoteMotorBuffer[ArduinoConnection.Motors.DUMP.ordinal()]);
                     activity.arduinoConnection.setActuate(remoteMotorBuffer[ArduinoConnection.Motors.DIG_LIFT.ordinal()]);
-                    activity.arduinoConnection.setDig(remoteMotorBuffer[ArduinoConnection.Motors.DIG.ordinal()]);
+                    activity.arduinoConnection.setDig(remoteMotorBuffer[ArduinoConnection.Motors.DIG.ordinal()]);*/
                 }
             }
-
-            Log.v(NETWORK_TAG, "About to print RNB");
-
-            activity.networkStatusView.post(new Runnable() {
-                @Override
-                public void run() {
-                    activity.networkStatusView.setText("Connected to computer! Autonomy Active: " + activity.autonomyLogic.autonomyActive);
-                }
-            });
-
-            if (!activity.autonomyLogic.autonomyActive)
-                if (activity.arduinoConnection.arduinoConnected()){
-                    synchronized (activity.bufferLock){
-                        activity.arduinoConnection.sendCommands();
-                    }
-                }
-                else
-                    Log.v(NETWORK_TAG, "No Arduino connected");
-
-            Log.v(NETWORK_TAG, "AfterMessage");
         }
     }
 }
